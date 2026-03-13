@@ -1,0 +1,26 @@
+{
+  "name": "cat-pet",
+  "version": "3.0.0",
+  "description": "🐱 虚拟猫咪养成系统 - 创建、养育、互动你的专属电子宠物猫",
+  "main": "cat-core.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "keywords": [
+    "openclaw",
+    "skill",
+    "cat",
+    "pet",
+    "game",
+    "养成",
+    "猫咪"
+  ],
+  "author": "OpenClaw Community",
+  "license": "MIT",
+  "clawhub": {
+    "name": "cat-pet",
+    "description": "虚拟猫咪养成系统",
+    "emoji": "🐱",
+    "version": "3.0.0"
+  }
+}

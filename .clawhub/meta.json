@@ -1,0 +1,90 @@
+{
+  "name": "cat-pet",
+  "displayName": "🐱 猫咪养成系统",
+  "version": "3.0.0",
+  "description": "创建、养育、互动你的专属电子宠物猫",
+  "author": "OpenClaw Community",
+  "license": "MIT",
+  "homepage": "https://github.com/openclaw/workspace/skills/cat-pet",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openclaw/workspace/skills/cat-pet"
+  },
+  "keywords": [
+    "openclaw",
+    "skill",
+    "cat",
+    "pet",
+    "game",
+    "养成",
+    "猫咪",
+    "电子宠物"
+  ],
+  "categories": [
+    "game",
+    "entertainment",
+    "lifestyle"
+  ],
+  "emoji": "🐱",
+  "screenshots": [],
+  "requirements": {
+    "openclaw": ">=2026.3.0",
+    "node": ">=18.0.0"
+  },
+  "features": [
+    "随机猫咪生成",
+    "自定义创建",
+    "状态管理系统",
+    "多种互动方式",
+    "成就系统",
+    "数据持久化",
+    "健康福祉系统",
+    "时空门探索",
+    "跨用户社交",
+    "玩具商店"
+  ],
+  "commands": [
+    "创建猫咪",
+    "看看我的猫",
+    "喂食",
+    "玩耍",
+    "洗澡",
+    "睡觉",
+    "摸摸",
+    "查看成就",
+    "健康检查",
+    "打开时空门",
+    "商店"
+  ],
+  "changelog": {
+    "3.0.0": {
+      "date": "2026-03-13",
+      "changes": [
+        "重构为纯工具函数架构",
+        "移除直接 LLM 调用",
+        "符合 OpenClaw 标准",
+        "优化代码结构",
+        "完善文档体系"
+      ]
+    },
+    "2.0.0": {
+      "date": "2026-03-13",
+      "changes": [
+        "健康福祉系统",
+        "时空门系统",
+        "跨用户社交",
+        "扩展玩具商店"
+      ]
+    },
+    "1.0.0": {
+      "date": "2026-03-12",
+      "changes": [
+        "初始版本发布",
+        "随机猫咪生成系统",
+        "完整状态管理系统",
+        "5 种互动方式",
+        "成就系统"
+      ]
+    }
+  }
+}

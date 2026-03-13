@@ -1,0 +1,19 @@
+# 测试数据
+data/
+backup/
+logs/
+
+# 依赖
+node_modules/
+
+# 临时文件
+*.log
+*.tmp
+*.bak
+
+# 归档测试
+tests/archive/
+
+# 开发文件
+.env
+.DS_Store
