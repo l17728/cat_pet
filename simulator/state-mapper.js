@@ -13,41 +13,51 @@
  * 优先级从高到低
  */
 const MAPPING_RULES = [
-  // 紧急状态 - 需要立即关注
+  // === 紧急状态 → error (错误 bug 动画) ===
   {
     name: 'hungry',
-    condition: (cat) => cat.stats.hunger < 30,
+    condition: (cat) => cat.stats.hunger < 25,
     state: 'error',
-    detail: (cat) => `${cat.name} 饿了喵！饱食度: ${cat.stats.hunger}`
+    detail: (cat) => `${cat.name} 饿坏了！🍖 饱食:${cat.stats.hunger}`
   },
   {
     name: 'dirty',
-    condition: (cat) => cat.stats.cleanliness < 30,
+    condition: (cat) => cat.stats.cleanliness < 25,
     state: 'error',
-    detail: (cat) => `${cat.name} 需要洗澡！清洁度: ${cat.stats.cleanliness}`
+    detail: (cat) => `${cat.name} 太脏了需要洗澡！🛁 清洁:${cat.stats.cleanliness}`
   },
+
+  // === 深度睡眠/打盹 → idle (star_idle 角色动画) ===
   {
     name: 'exhausted',
     condition: (cat) => cat.stats.energy < 20,
     state: 'idle',
-    detail: (cat) => `${cat.name} 累坏了，在休息... 精力: ${cat.stats.energy}`
+    detail: (cat) => `${cat.name} 累坏了，睡着了... 💤 精力:${cat.stats.energy}`
   },
-  
-  // 活跃状态 - 正在进行某事
+  {
+    name: 'napping',
+    condition: (cat) => cat.stats.energy < 40 && cat.stats.mood < 45,
+    state: 'idle',
+    detail: (cat) => `${cat.name} 在打盹~ 😴 精力:${cat.stats.energy}`
+  },
+
+  // === 高度兴奋 → syncing (同步动画) ===
   {
     name: 'playing',
     condition: (cat) => cat.stats.mood > 80 && cat.stats.energy > 50,
     state: 'syncing',
-    detail: (cat) => `${cat.name} 玩得很开心！心情: ${cat.stats.mood}`
+    detail: (cat) => `${cat.name} 玩耍中！开心极了！🎾 心情:${cat.stats.mood}`
   },
+
+  // === 消化饱食 → executing (star_working 动画) ===
   {
-    name: 'eating',
-    condition: (cat) => cat.stats.hunger > 80 && cat.stats.energy > 40,
+    name: 'digesting',
+    condition: (cat) => cat.stats.hunger > 75 && cat.stats.energy > 35,
     state: 'executing',
-    detail: (cat) => `${cat.name} 刚刚吃饱，在消化中~`
+    detail: (cat) => `${cat.name} 吃饱了在消化~ 🍖 饱食:${cat.stats.hunger}`
   },
-  
-  // 正常状态 - 工作区
+
+  // === 正常活跃 → writing (star_working 动画) ===
   {
     name: 'healthy',
     condition: (cat) => {
@@ -55,15 +65,40 @@ const MAPPING_RULES = [
       return avg >= 60;
     },
     state: 'writing',
-    detail: (cat) => `${cat.name} 状态良好，正在探索世界~`
+    detail: (cat) => `${cat.name} 状态良好，在巡视领地~`
   },
-  
-  // 默认状态 - 休息区
+
+  // === 好奇探索 → researching (star_researching 动画) ===
+  // 状态中等时猫咪会四处探索，触发 star_researching 动画
+  {
+    name: 'exploring',
+    condition: (cat) => cat.stats.mood > 50 && cat.stats.energy > 40,
+    state: 'researching',
+    detail: (cat) => `${cat.name} 在探索领地~ 🐾 心情:${cat.stats.mood}`
+  },
+
+  // === 梳毛/保养 → syncing (同步动画) ===
+  {
+    name: 'grooming',
+    condition: (cat) => cat.stats.cleanliness > 55 && cat.stats.energy > 30,
+    state: 'syncing',
+    detail: (cat) => `${cat.name} 在梳理毛毛~ ✨ 清洁:${cat.stats.cleanliness}`
+  },
+
+  // === 低能休息 → idle (star_idle 动画) ===
   {
     name: 'resting',
-    condition: () => true, // 兜底规则
+    condition: (cat) => cat.stats.energy < 55,
     state: 'idle',
-    detail: (cat) => `${cat.name} 在休息中...`
+    detail: (cat) => `${cat.name} 有点累，在休息... 精力:${cat.stats.energy}`
+  },
+
+  // === 兜底 ===
+  {
+    name: 'default',
+    condition: () => true,
+    state: 'idle',
+    detail: (cat) => `${cat.name} 在发呆~`
   }
 ];
 

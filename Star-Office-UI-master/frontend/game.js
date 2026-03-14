@@ -188,6 +188,7 @@ const BUBBLE_TEXTS = {
 };
 
 let game, star, sofa, serverroom, areas = {}, currentState = 'idle', pendingDesiredState = null, statusText, lastFetch = 0, lastBlink = 0, lastBubble = 0, targetX = 660, targetY = 170, bubble = null, typewriterText = '', typewriterTarget = '', typewriterIndex = 0, lastTypewriter = 0, syncAnimSprite = null, catBubble = null;
+let currentCatData = null; // 当前猫咪状态，用于气泡文本和角色动画
 let isMoving = false;
 let waypoints = [];
 let lastWanderAt = 0;
@@ -726,6 +727,16 @@ function updateCatStatusPanel(data) {
       el.textContent = data.cat[stat];
     }
   });
+
+  // 保存最新猫咪状态数据
+  if (data.cat && data.cat.name) currentCatData = data.cat;
+
+  // 根据心情更新装饰猫咪的帧（0-3开心 4-7普通 8-11难过）
+  if (data.cat && data.cat.mood !== undefined && window.catSprite) {
+    const m = data.cat.mood;
+    const base = m >= 70 ? 0 : m >= 40 ? 4 : 8;
+    window.catSprite.setFrame(base + Math.floor(Math.random() * 4));
+  }
 }
 
 function fetchStatus() {
@@ -754,12 +765,23 @@ function fetchStatus() {
         currentState = nextState;
 
         if (nextState === 'idle') {
-          if (game.textures.exists('sofa_busy')) {
-            sofa.setTexture('sofa_busy');
-            sofa.anims.play('sofa_busy', true);
+          sofa.anims.stop();
+          sofa.setTexture('sofa_idle');
+          star.setVisible(true);
+          if (!star.anims.isPlaying || star.anims.currentAnim?.key !== 'star_idle') {
+            star.anims.play('star_idle', true);
           }
-          star.setVisible(false);
-          star.anims.stop();
+          if (window.starWorking) {
+            window.starWorking.setVisible(false);
+            window.starWorking.anims.stop();
+          }
+        } else if (nextState === 'researching') {
+          sofa.anims.stop();
+          sofa.setTexture('sofa_idle');
+          star.setVisible(true);
+          if (!star.anims.isPlaying || star.anims.currentAnim?.key !== 'star_researching') {
+            star.anims.play('star_researching', true);
+          }
           if (window.starWorking) {
             window.starWorking.setVisible(false);
             window.starWorking.anims.stop();
@@ -857,8 +879,21 @@ function moveStar(time) {
           pendingDesiredState = null;
 
           if (currentState === 'idle') {
-            star.setVisible(false);
-            star.anims.stop();
+            sofa.anims.stop();
+            sofa.setTexture('sofa_idle');
+            star.setVisible(true);
+            if (!star.anims.isPlaying || star.anims.currentAnim?.key !== 'star_idle') {
+              star.anims.play('star_idle', true);
+            }
+            if (window.starWorking) {
+              window.starWorking.setVisible(false);
+              window.starWorking.anims.stop();
+            }
+          } else if (currentState === 'researching') {
+            star.setVisible(true);
+            if (!star.anims.isPlaying || star.anims.currentAnim?.key !== 'star_researching') {
+              star.anims.play('star_researching', true);
+            }
             if (window.starWorking) {
               window.starWorking.setVisible(false);
               window.starWorking.anims.stop();
@@ -880,15 +915,26 @@ function moveStar(time) {
         pendingDesiredState = null;
 
         if (currentState === 'idle') {
-          star.setVisible(false);
-          star.anims.stop();
+          sofa.anims.stop();
+          sofa.setTexture('sofa_idle');
+          star.setVisible(true);
+          if (!star.anims.isPlaying || star.anims.currentAnim?.key !== 'star_idle') {
+            star.anims.play('star_idle', true);
+          }
           if (window.starWorking) {
             window.starWorking.setVisible(false);
             window.starWorking.anims.stop();
           }
-          if (game.textures.exists('sofa_busy')) {
-            sofa.setTexture('sofa_busy');
-            sofa.anims.play('sofa_busy', true);
+        } else if (currentState === 'researching') {
+          sofa.anims.stop();
+          sofa.setTexture('sofa_idle');
+          star.setVisible(true);
+          if (!star.anims.isPlaying || star.anims.currentAnim?.key !== 'star_researching') {
+            star.anims.play('star_researching', true);
+          }
+          if (window.starWorking) {
+            window.starWorking.setVisible(false);
+            window.starWorking.anims.stop();
           }
         } else {
           star.setVisible(false);
@@ -908,7 +954,6 @@ function moveStar(time) {
 function showBubble() {
   if (bubble) { bubble.destroy(); bubble = null; }
   const texts = BUBBLE_TEXTS[currentState] || BUBBLE_TEXTS.idle;
-  if (currentState === 'idle') return;
 
   let anchorX = star.x;
   let anchorY = star.y;
@@ -936,7 +981,22 @@ function showBubble() {
 function showCatBubble() {
   if (!window.catSprite) return;
   if (window.catBubble) { window.catBubble.destroy(); window.catBubble = null; }
-  const texts = BUBBLE_TEXTS.cat || ['喵~', '咕噜咕噜…'];
+  let texts;
+  if (currentCatData) {
+    const { energy, mood, hunger, cleanliness } = currentCatData;
+    if (hunger !== undefined && hunger < 35)
+      texts = ['喵！我饿了！', '肚子咕咕叫...', '什么时候有饭？', '饿饿~ 喵呜'];
+    else if (energy !== undefined && energy < 30)
+      texts = ['困了...zzz', '让我睡一会儿', '好累啊...喵', '眼皮好重...'];
+    else if (cleanliness !== undefined && cleanliness < 35)
+      texts = ['我脏脏的...', '给我洗澡吧', '毛毛乱掉了', '需要梳毛~'];
+    else if (mood !== undefined && mood > 75)
+      texts = ['喵呜！好开心！', '今天真幸福~', '蹭蹭你的腿~', '呼噜呼噜♪', '快来陪我玩！'];
+    else
+      texts = BUBBLE_TEXTS.cat;
+  } else {
+    texts = BUBBLE_TEXTS.cat || ['喵~', '咕噜咕噜…'];
+  }
   const text = texts[Math.floor(Math.random() * texts.length)];
   const anchorX = window.catSprite.x;
   const anchorY = window.catSprite.y - 60;
