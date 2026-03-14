@@ -299,8 +299,8 @@ class CatPetBridge {
     this.scheduler = new BackgroundScheduler({
       userId: this.userId,
       catId: this.catId,
-      decayInterval: this.config.decayInterval || 20 * 1000,  // 20秒
-      autoActionInterval: this.config.autoActionInterval || 10 * 1000,  // 10秒
+      decayInterval: this.config.decayInterval || 60 * 60 * 1000,  // 1小时
+      autoActionInterval: this.config.autoActionInterval || 30 * 60 * 1000,  // 30分钟
       enableLLM: this.llm.isAvailable(),
       llmClient: this.llm,
       
@@ -363,6 +363,7 @@ class CatPetBridge {
     }
     
     await this.pushToChat('🎮 猫咪养成系统已启动！你可以：\n• 喂食、玩耍、洗澡、睡觉、摸摸\n• 查看猫咪状态\n• 等待猫咪自主行动', 'system');
+    console.log('🎮 猫咪养成系统已启动');
     
     return true;
   }
@@ -415,8 +416,7 @@ class CatPetBridge {
   async handleWarnings(warnings) {
     for (const warning of warnings) {
       console.log(`⚠️ ${warning}`);
-      await this.pushToChat(warning, 'warning');
-      // 写入日记（对应 OpenClaw memory/YYYY-MM-DD.md）
+      // 写入日记，不推送到聊天窗口（警告信息属于内部状态，非猫咪对话）
       if (this.catId) memory.appendDiary(this.catId, `⚠️ ${warning}`);
     }
     await this.sync();
