@@ -7,6 +7,7 @@
 
 const catCore = require('../cat-core.js');
 const { loadCatData, saveCatData } = require('../core/evolvable');
+const memory = require('./memory-manager');
 
 class BackgroundScheduler {
   constructor(options = {}) {
@@ -20,8 +21,9 @@ class BackgroundScheduler {
     
     // 定时器
     this.decayTimer = null;
-    this.autoActionTimer = null;
+    this.autoActionTimer = null;  // 现在用 setTimeout 实现动态调度
     this.syncTimer = null;
+    this.todoCheckTimer = null;   // todo.md 任务检查定时器
     
     // 回调
     this.onDecay = options.onDecay || (() => {});
@@ -52,11 +54,16 @@ class BackgroundScheduler {
     
     // 立即执行一次
     this.runDecay();
-    
-    // 定时任务
+
+    // 衰减：固定间隔（时间流逝是物理规律，不需要 LLM 决策）
     this.decayTimer = setInterval(() => this.runDecay(), this.decayInterval);
-    this.autoActionTimer = setInterval(() => this.runAutoAction(), this.autoActionInterval);
-    // 只有提供了 onSync 回调时才启动 sync 定时器，避免与 bridge 自身的 syncTimer 重复
+
+    // 自主行为：动态间隔，由 LLM 决定下次检查时间（对应 OpenClaw cron 动态调度）
+    this._scheduleNextAutoAction(this.autoActionInterval);
+
+    // todo.md 任务检查：每 30 秒轮询一次到期任务（对应 OpenClaw cron 每 15 分钟触发）
+    this.todoCheckTimer = setInterval(() => this._checkTodoTasks(), 30 * 1000);
+
     if (this.onSync) {
       this.syncTimer = setInterval(() => this.runSync(), this.syncInterval);
     }
@@ -69,8 +76,9 @@ class BackgroundScheduler {
     this.isRunning = false;
     
     if (this.decayTimer) clearInterval(this.decayTimer);
-    if (this.autoActionTimer) clearInterval(this.autoActionTimer);
+    if (this.autoActionTimer) clearTimeout(this.autoActionTimer);
     if (this.syncTimer) clearInterval(this.syncTimer);
+    if (this.todoCheckTimer) clearInterval(this.todoCheckTimer);
     
     this.decayTimer = null;
     this.autoActionTimer = null;
@@ -143,7 +151,52 @@ class BackgroundScheduler {
   }
 
   /**
+   * 动态调度下次自主行为检查
+   * 对应 OpenClaw cron：LLM 的响应决定下次唤醒时间
+   * @param {number} delayMs - 等待毫秒数
+   */
+  _scheduleNextAutoAction(delayMs) {
+    this.autoActionTimer = setTimeout(async () => {
+      if (!this.isRunning) return;
+      const nextDelayMs = await this.runAutoAction();
+      // LLM 返回了建议间隔则用它，否则退回默认
+      this._scheduleNextAutoAction(nextDelayMs || this.autoActionInterval);
+    }, delayMs);
+  }
+
+  /**
+   * 检查 todo.md 中到期的任务并执行
+   * 对应 OpenClaw cron 每次触发后"检查 todo.md，执行未完成的定时任务"
+   */
+  async _checkTodoTasks() {
+    if (!this.catId) return;
+    const due = memory.getDueTasks();
+    if (due.length === 0) return;
+
+    for (const item of due) {
+      console.log(`📋 [todo] 执行到期任务: ${item.time} ${item.task}`);
+
+      // 将任务描述转为 action（简单关键词映射）
+      const actionMap = { '喂食': 'feed', '玩耍': 'play', '洗澡': 'bathe', '睡觉': 'sleep', '摸摸': 'pet' };
+      const action = Object.entries(actionMap).find(([k]) => item.task.includes(k))?.[1];
+
+      if (action) {
+        const result = catCore[action]?.(this.userId, this.catId);
+        if (result?.success) {
+          console.log(`  ✅ ${result.reaction || action + ' 完成'}`);
+          if (this.catId) memory.appendDiary(this.catId, `[todo] ${item.task}: ${result.reaction || '完成'}`);
+          this.onAutoAction?.({ action, description: item.task, notifyOwner: true,
+            notificationMessage: `⏰ 定时任务: ${item.task}` });
+        }
+      }
+
+      memory.markTodoDone(item.task);
+    }
+  }
+
+  /**
    * 自主行为决策
+   * @returns {number|null} 下次检查的毫秒数（null 则使用默认间隔）
    */
   async runAutoAction() {
     if (!this.catId) return;
@@ -156,17 +209,35 @@ class BackgroundScheduler {
       const action = await this.decideWithLLM(cat);
       if (action) {
         this.executeAction(cat, action);
-        this.onAutoAction(action);
-        return;
+        this.onAutoAction?.(action);
+        // 写入日记
+        if (this.catId) memory.appendDiary(this.catId, `[自主] ${action.description || action.action}`);
+        // LLM 建议写入 todo.md 的未来任务（对应 OpenClaw LLM 向 todo.md 写入任务）
+        if (action.todo_task) {
+          const match = String(action.todo_task).match(/^(\d{2}:\d{2})\s+(.+)$/);
+          if (match) {
+            memory.addTodoTask(match[1], match[2]);
+            console.log(`📋 [todo] 已添加任务: ${action.todo_task}`);
+          }
+        }
+        // LLM 建议的下次检查时间（对应 OpenClaw cron 动态调度）
+        if (action.next_check_minutes) {
+          const ms = action.next_check_minutes * 60 * 1000;
+          console.log(`⏱️ [调度] LLM 建议 ${action.next_check_minutes} 分钟后再检查`);
+          return ms;
+        }
+        return null;
       }
     }
-    
+
     // 否则使用规则决策
     const action = this.decideWithRules(cat);
     if (action) {
       this.executeAction(cat, action);
-      this.onAutoAction(action);
+      this.onAutoAction?.(action);
+      if (this.catId) memory.appendDiary(this.catId, `[自主] ${action.description || action.action}`);
     }
+    return null;
   }
 
   /**

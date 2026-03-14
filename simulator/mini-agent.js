@@ -15,6 +15,7 @@ const IntentRecognizer = require('./intent-recognizer');
 const ResponseFormatter = require('./response-formatter');
 const LLMAdapter = require('./llm-adapter');
 const { loadCatData, saveCatData } = require('../core/evolvable');
+const memory = require('./memory-manager');
 
 // 注入 LLM 适配器到全局
 let globalLLMAdapter = null;
@@ -108,10 +109,16 @@ class MiniAgent {
       response = await this.formatter.format(intentResult.intent, actionResult, cat);
     }
 
-    // 6. 将 LLM 回复追加到对话历史
+    // 6. 将 LLM 回复追加到对话历史（同时自动持久化到磁盘）
     this.bridge.addToHistory('assistant', response);
 
-    // 7. 推送用户消息和猫咪回复到聊天窗口
+    // 7. 写入游戏日记（对应 OpenClaw memory/YYYY-MM-DD.md）
+    if (this.catId) {
+      memory.appendDiary(this.catId, `用户: ${input}`);
+      memory.appendDiary(this.catId, `猫咪[${intentResult.intent}]: ${response.slice(0, 80)}${response.length > 80 ? '…' : ''}`);
+    }
+
+    // 8. 推送用户消息和猫咪回复到聊天窗口
     await this.pushChatMessage(input, response);
 
     return response;

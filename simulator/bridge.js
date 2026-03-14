@@ -16,6 +16,7 @@ const OfficeClient = require('./office-client');
 const BackgroundScheduler = require('./background-scheduler');
 const LLMAdapter = require('./llm-adapter');
 const { mapCatToOffice, getCatStatusSummary, adjustDetailByPersonality } = require('./state-mapper');
+const memory = require('./memory-manager');
 
 // 加载 cat-pet 模块 (从上级目录)
 const catCore = require('../cat-core.js');
@@ -49,12 +50,13 @@ class CatPetBridge {
       model: options.llmModel || process.env.LLM_MODEL
     });
     
-    // ========== 新增：对话记录和上下文管理 ==========
-    this.conversationHistory = [];  // 对话历史记录
-    this.maxHistoryLength = 20;     // 最大保留对话轮数
-    this.systemPrompt = this._buildSystemPrompt();  // 系统提示词
-    this.isWaitingForUserInput = false;  // 是否等待用户输入
-    this.pendingAction = null;      // 待执行的动作
+    // ========== 对话记录和上下文管理 ==========
+    // 从磁盘加载已有历史，实现跨会话持久化（对应 OpenClaw 持久化 messages）
+    this.conversationHistory = memory.loadHistory(this.userId);
+    this.maxHistoryLength = 20;
+    this.systemPrompt = this._buildSystemPrompt();
+    this.isWaitingForUserInput = false;
+    this.pendingAction = null;
   }
 
   /**
@@ -89,14 +91,16 @@ class CatPetBridge {
       ...metadata
     };
     this.conversationHistory.push(message);
-    
+
     // 限制历史长度，保留最近的对话
     if (this.conversationHistory.length > this.maxHistoryLength * 2) {
-      // 保留系统消息和最近的对话
       const systemMessages = this.conversationHistory.filter(m => m.role === 'system');
       const recentMessages = this.conversationHistory.slice(-this.maxHistoryLength * 2);
       this.conversationHistory = [...systemMessages, ...recentMessages];
     }
+
+    // 持久化到磁盘（对应 OpenClaw 跨会话历史）
+    memory.saveHistory(this.userId, this.conversationHistory);
   }
 
   /**
@@ -216,9 +220,10 @@ class CatPetBridge {
       const response = await this.llm.chat(messages);
 
       if (response) {
-        // 追加 LLM 回复到对话历史并推送到聊天窗口
         this.addToHistory('assistant', response, { proactive: true, reason });
         await this.pushToChat(response, 'cat');
+        // 写入日记
+        if (this.catId) memory.appendDiary(this.catId, `[主动] ${response}`);
       }
 
       return response;
@@ -408,10 +413,10 @@ class CatPetBridge {
   async handleWarnings(warnings) {
     for (const warning of warnings) {
       console.log(`⚠️ ${warning}`);
-      // 推送到聊天窗口
       await this.pushToChat(warning, 'warning');
+      // 写入日记（对应 OpenClaw memory/YYYY-MM-DD.md）
+      if (this.catId) memory.appendDiary(this.catId, `⚠️ ${warning}`);
     }
-    // 同步警告状态到可视化
     await this.sync();
   }
 
@@ -557,12 +562,16 @@ class CatPetBridge {
     const result = actions[action]();
     if (result.success) {
       console.log(`✨ ${result.reaction || action + ' 成功'}`);
-      // 立即同步状态
+      // 写入日记
+      if (this.catId) {
+        const catName = result.cat?.name || '';
+        memory.appendDiary(this.catId, `${catName} ${action}: ${result.reaction || '成功'} | 状态: 精力${result.stats?.energy} 心情${result.stats?.mood} 饱食${result.stats?.hunger}`);
+      }
       await this.sync();
     } else {
       console.log('❌ 操作失败:', result.message || result.error);
     }
-    
+
     return result;
   }
 
