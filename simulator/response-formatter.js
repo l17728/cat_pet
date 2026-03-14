@@ -94,25 +94,89 @@ ${this._formatStats(stats)}
 ${wellness ? `\n【福祉状态】\n${this._formatStats(wellness)}` : ''}`;
       },
       
+      drink: (data) => {
+        const hydration = data.cat?.wellness?.hydration ?? data.stats?.hydration;
+        return `💧 咕嘟咕嘟喝水~${hydration !== undefined ? `\n💧 水分：${hydration}` : ''}`;
+      },
+
+      health: (data) => {
+        if (!data.success) return `❌ ${data.message || '获取状态失败'}`;
+        const { stats, wellness, warnings = [] } = data;
+        const warnText = warnings.length > 0 ? `\n\n⚠️ 警告：\n${warnings.join('\n')}` : '\n\n✅ 一切正常！';
+        return `🏥 健康检查结果
+${this._formatStats(stats)}${wellness ? `\n${this._formatStats(wellness)}` : ''}${warnText}`;
+      },
+
+      delete_cat: (data) => {
+        if (!data.success) return `❌ ${data.error || data.message || '删除失败'}`;
+        return `👋 再见了喵~ 猫咪已离开`;
+      },
+
+      achievements: (data) => {
+        if (data.error) return `❌ ${data.error}`;
+        const unlocked = data.achievements?.filter(a => a.unlocked) || [];
+        const lines = (data.achievements || []).map(a =>
+          `${a.unlocked ? '✅' : '⬜'} ${a.hidden && !a.unlocked ? '🤫 ???' : a.name}`
+        );
+        return `🏆 成就列表 (${data.unlocked || 0}/${data.total || 0} 已解锁)\n\n${lines.join('\n')}`;
+      },
+
+      get_cooldowns: (data) => {
+        if (!data.success) return `❌ ${data.message}`;
+        const lines = Object.entries(data.cooldowns).map(([action, info]) =>
+          info.ready
+            ? `✅ ${action}：可以了！`
+            : `⏰ ${action}：还需等待 ${info.waitMinutes} 分钟 (${info.expiresAt})`
+        );
+        return lines.length > 0
+          ? `⏱️ 冷却状态：\n${lines.join('\n')}`
+          : `✅ 所有动作都可以执行！`;
+      },
+
+      clear_cooldown: (data) => {
+        if (!data.success) return `❌ ${data.message}`;
+        return `✅ ${data.message}，现在可以立刻行动啦！`;
+      },
+
+      read_state: (data) => {
+        if (!data.success) return `❌ ${data.message}`;
+        const s = data.state;
+        return `📂 原始状态 (${s.name})
+stats: ${JSON.stringify(s.stats)}
+wellness: ${JSON.stringify(s.wellness)}
+cooldowns: ${JSON.stringify(s.cooldowns || {})}`;
+      },
+
+      write_state: (data) => {
+        if (!data.success) return `❌ ${data.message}`;
+        return `✅ ${data.message}`;
+      },
+
       error: (data) => {
         return `❌ ${data.message || '出错了喵...'}`;
       },
-      
+
       help: () => {
         return `🐱 猫咪模拟器帮助
 
-【基础命令】
-创建猫、喂食、玩耍、洗澡、睡觉、摸摸
+【基础互动】
+喂食、玩耍、洗澡、睡觉、摸摸、喝水
 
-【查看状态】
-状态、健康检查
+【创建/删除】
+创建猫、删除猫
 
-【扩展功能】
-商店、拜访
+【查看信息】
+状态、健康检查、成就
+
+【定时器管理】
+查看冷却、重置冷却、重置喂食冷却
+
+【状态文件】
+读取状态、修改状态
 
 直接用自然语言和我说话就可以啦~`;
       },
-      
+
       unknown: () => {
         return `喵？我没听懂...
 试试说：喂食、玩耍、看看猫、帮助`;

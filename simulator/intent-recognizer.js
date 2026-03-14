@@ -132,23 +132,25 @@ class IntentRecognizer {
    */
   async recognize(input) {
     const normalizedInput = input.toLowerCase().trim();
-    
-    // 1. 先尝试规则匹配 (快速返回)
+
+    // 1. 先尝试规则匹配
     const ruleResult = this.matchRules(normalizedInput);
-    if (ruleResult) {
+
+    // 2. 规则置信度足够高则直接返回
+    if (ruleResult.confidence >= 0.8) {
       return ruleResult;
     }
-    
-    // 2. 如果有 LLM 且规则不匹配，使用 LLM 识别
-    if (this.llm && this.llm.isAvailable() && ruleResult?.confidence < 0.8) {
+
+    // 3. 规则未命中（unknown/low confidence），有 LLM 则交 LLM 识别
+    if (this.llm && this.llm.isAvailable()) {
       const llmResult = await this.recognizeWithLLM(input);
-      if (llmResult) {
+      if (llmResult && llmResult.confidence >= 0.5) {
         return llmResult;
       }
     }
-    
-    // 3. 返回默认
-    return { intent: 'unknown', params: {}, confidence: 0 };
+
+    // 4. 兜底返回规则结果（可能是 unknown）
+    return ruleResult;
   }
 
   /**
