@@ -4726,9 +4726,6 @@ function toggleBrokerPanel() {
                             typewriterTarget = nextLine;
                             typewriterText = '';
                             typewriterIndex = 0;
-                            // 将状态变化消息添加到对话框
-                            const catName = document.getElementById('cat-name-text')?.textContent || '小橘';
-                            addCatResponse(`${stateInfo.name}，${catName}，${data.detail || '...'}`);
                         } else {
                             if (!typewriterTarget || typewriterTarget !== nextLine) {
                                 typewriterTarget = nextLine;
@@ -4987,7 +4984,7 @@ function toggleBrokerPanel() {
                   addChatMessage('cat', '喵呜~ (猫咪在思考中，请稍后再问)');
                 }
               } catch (e) {
-                clearInterval(poll);
+                // 网络错误不停止轮询，等超时后再提示
               }
             }, pollInterval);
           } catch (e) {
