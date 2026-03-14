@@ -75,6 +75,39 @@ class IntentRecognizer {
         patterns: ['拜访', '去别人家', 'visit']
       },
       
+      // 成就
+      {
+        intent: 'achievements',
+        patterns: ['成就', '徽章', 'achievement', '我解锁了什么', '奖励']
+      },
+
+      // 冷却/定时器查询
+      {
+        intent: 'get_cooldowns',
+        patterns: ['冷却', '还要等(多久|多少)', '能(再)?喂吗', '能(再)?玩吗', '定时器', '等待时间', '什么时候能']
+      },
+
+      // 重置冷却/定时器
+      {
+        intent: 'clear_cooldown',
+        patterns: ['重置冷却', '清除冷却', '清除等待', '重置定时', '跳过等待', '取消冷却', '重置所有冷却'],
+        params: {
+          action: ['重置(喂食|玩耍|洗澡|睡觉|摸摸)冷却', '清除(喂食|玩耍|洗澡|睡觉|摸摸)']
+        }
+      },
+
+      // 读取原始状态文件
+      {
+        intent: 'read_state',
+        patterns: ['读取状态', '状态文件', '原始数据', '查看数据', '导出状态', '显示原始']
+      },
+
+      // 修改状态文件（部分更新）
+      {
+        intent: 'write_state',
+        patterns: ['修改状态', '设置状态', '更新数据', '直接设置', '强制设置']
+      },
+
       // 帮助
       {
         intent: 'help',

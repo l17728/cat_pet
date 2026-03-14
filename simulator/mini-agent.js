@@ -202,19 +202,37 @@ class MiniAgent {
       
       case 'drink':
         return this._giveWater();
-      
+
       case 'status':
         return this.bridge.getCatStatus();
-      
+
       case 'health':
         return this._healthCheck();
-      
+
+      case 'delete_cat':
+        return this._deleteCat();
+
+      case 'achievements':
+        return this._getAchievements();
+
+      case 'get_cooldowns':
+        return this._getCooldowns();
+
+      case 'clear_cooldown':
+        return this._clearCooldown(params.action);
+
+      case 'read_state':
+        return this._readState();
+
+      case 'write_state':
+        return this._writeState(params);
+
       case 'help':
         return { intent: 'help' };
-      
+
       case 'chat':
         return { intent: 'chat', response: params.response };
-      
+
       default:
         return { intent: 'unknown', message: '未知命令' };
     }
@@ -258,6 +276,120 @@ class MiniAgent {
       stats: cat.stats,
       reaction: '咕嘟咕嘟喝水~'
     };
+  }
+
+  /**
+   * 删除猫咪
+   */
+  _deleteCat() {
+    if (!this.catId) return { success: false, message: '没有猫咪' };
+    const catCore = require('../cat-core.js');
+    const result = catCore.deleteCat(this.userId, this.catId);
+    if (result.success) {
+      this.catId = null;
+      this.bridge.catId = null;
+    }
+    return result;
+  }
+
+  /**
+   * 获取成就列表
+   */
+  _getAchievements() {
+    if (!this.catId) return { success: false, message: '没有猫咪' };
+    const catCore = require('../cat-core.js');
+    return catCore.getAchievements(this.userId, this.catId);
+  }
+
+  /**
+   * 查询当前所有冷却时间
+   */
+  _getCooldowns() {
+    if (!this.catId) return { success: false, message: '没有猫咪' };
+    const cat = loadCatData(this.catId);
+    if (!cat) return { success: false, message: '猫咪数据不存在' };
+
+    const now = Date.now();
+    const cooldowns = cat.cooldowns || {};
+    const result = {};
+
+    for (const [action, expiry] of Object.entries(cooldowns)) {
+      const remainMs = expiry - now;
+      result[action] = remainMs > 0
+        ? { ready: false, waitMinutes: Math.ceil(remainMs / 60000), expiresAt: new Date(expiry).toLocaleTimeString() }
+        : { ready: true };
+    }
+
+    return { success: true, cooldowns: result };
+  }
+
+  /**
+   * 重置冷却（不修改 skill 代码，直接操作状态文件）
+   * @param {string} action - 指定动作 (feed/play/bathe/sleep/pet)，为空则清除全部
+   */
+  _clearCooldown(action) {
+    if (!this.catId) return { success: false, message: '没有猫咪' };
+    const cat = loadCatData(this.catId);
+    if (!cat) return { success: false, message: '猫咪数据不存在' };
+
+    if (!cat.cooldowns) cat.cooldowns = {};
+
+    // 动作名映射（兼容中文）
+    const actionMap = { '喂食': 'feed', '玩耍': 'play', '洗澡': 'bathe', '睡觉': 'sleep', '摸摸': 'pet' };
+    const key = actionMap[action] || action;
+
+    if (key && cat.cooldowns[key] !== undefined) {
+      delete cat.cooldowns[key];
+      saveCatData(this.catId, cat);
+      return { success: true, message: `已重置 ${key} 冷却` };
+    } else {
+      // 清除全部
+      cat.cooldowns = {};
+      saveCatData(this.catId, cat);
+      return { success: true, message: '已重置所有冷却' };
+    }
+  }
+
+  /**
+   * 读取原始状态文件（供调试/高级查询）
+   */
+  _readState() {
+    if (!this.catId) return { success: false, message: '没有猫咪' };
+    const cat = loadCatData(this.catId);
+    if (!cat) return { success: false, message: '猫咪数据不存在' };
+    return { success: true, state: cat };
+  }
+
+  /**
+   * 写入状态文件的部分字段（不覆盖 id/userId 等关键字段）
+   * @param {object} updates - 允许更新 stats/wellness/cooldowns 子对象
+   */
+  _writeState(updates) {
+    if (!this.catId) return { success: false, message: '没有猫咪' };
+    const cat = loadCatData(this.catId);
+    if (!cat) return { success: false, message: '猫咪数据不存在' };
+
+    // 只允许修改安全字段，保护 id/userId 等
+    const SAFE_KEYS = ['stats', 'wellness', 'cooldowns', 'name', 'personality'];
+    const applied = [];
+
+    for (const key of SAFE_KEYS) {
+      if (updates[key] !== undefined) {
+        if (typeof updates[key] === 'object' && !Array.isArray(updates[key])) {
+          cat[key] = { ...cat[key], ...updates[key] };
+        } else {
+          cat[key] = updates[key];
+        }
+        applied.push(key);
+      }
+    }
+
+    if (applied.length === 0) {
+      return { success: false, message: `未找到可更新字段，允许字段: ${SAFE_KEYS.join(', ')}` };
+    }
+
+    saveCatData(this.catId, cat);
+    return { success: true, message: `已更新: ${applied.join(', ')}`, state: cat };
   }
 
   /**
