@@ -139,7 +139,8 @@ class ReactionSystem extends IEvolvable {
    */
   async needsNewItem(context) {
     const cat = this.getCat();
-    
+    if (!cat) return false;
+
     // 如果猫咪心情很低或很高，可能产生独特反应
     if (cat.stats.mood < 30 || cat.stats.mood > 85) {
       return true;

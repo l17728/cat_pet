@@ -54,7 +54,6 @@ class EvolutionManager {
     }
     return await this.autoActionSystem.explorePortal(portalId);
   }
-}
   
   /**
    * 注册系统
@@ -74,8 +73,12 @@ class EvolutionManager {
    * 交互后检查所有系统的进化可能
    */
   async checkAllEvolutions(context) {
+    // 若猫咪已不存在（如测试清理后），直接跳过
+    const cat = loadCatData(this.catId);
+    if (!cat) return [];
+
     const results = [];
-    
+
     for (const [name, system] of this.systems) {
       try {
         // 检查是否需要创建新项

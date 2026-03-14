@@ -84,7 +84,8 @@ class FacilitySystem extends IEvolvable {
    */
   async needsNewItem(context) {
     const cat = this.getCat();
-    
+    if (!cat) return false;
+
     // 信任度达到 60 以上，想要改造设施
     if ((cat.trustLevel || 0) >= 60) {
       return true;

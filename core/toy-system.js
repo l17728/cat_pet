@@ -100,8 +100,10 @@ class ToySystem extends IEvolvable {
    */
   async needsNewItem(context) {
     const cat = this.getCat();
+    if (!cat) return false;
+
     const available = this.getAvailableItems();
-    
+
     // 如果玩具玩了很久，可能需要新玩法
     const toy = context.toy;
     if (toy) {

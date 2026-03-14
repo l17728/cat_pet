@@ -3,6 +3,10 @@
  * Evolvable Interface - Base class for all evolvable systems
  * 
  * 所有支持动态扩展的系统都继承这个基类
+ * 
+ * 支持多种 LLM 后端:
+ * - 模拟器注入的 LLM 适配器 (优先)
+ * - OpenClaw sessions_spawn (回退)
  */
 
 const path = require('path');
@@ -45,9 +49,25 @@ function saveCatData(catId, data) {
 }
 
 /**
- * LLM 调用封装（使用 OpenClaw sessions_spawn）
+ * LLM 调用封装
+ * 
+ * 优先级:
+ * 1. 全局注入的 LLM 适配器 (模拟器模式)
+ * 2. OpenClaw sessions_spawn (平台模式)
+ * 3. 返回 null (离线模式)
  */
 async function callLLM(prompt, options = {}) {
+  // 1. 优先使用注入的 LLM 适配器
+  if (global.llmAdapter && typeof global.llmAdapter.call === 'function') {
+    try {
+      const result = await global.llmAdapter.call(prompt, options);
+      if (result) return result;
+    } catch (error) {
+      console.error('[LLM] 注入适配器调用失败:', error.message);
+    }
+  }
+  
+  // 2. 回退到 OpenClaw sessions_spawn
   try {
     const { sessions_spawn } = require('openclaw');
     
@@ -67,9 +87,14 @@ async function callLLM(prompt, options = {}) {
     
     return JSON.stringify(result);
   } catch (error) {
-    console.error('[LLM] 调用失败:', error.message);
-    return null;
+    // OpenClaw 不可用或调用失败
+    if (error.code !== 'MODULE_NOT_FOUND') {
+      console.error('[LLM] OpenClaw 调用失败:', error.message);
+    }
   }
+  
+  // 3. 返回 null (离线模式)
+  return null;
 }
 
 /**
