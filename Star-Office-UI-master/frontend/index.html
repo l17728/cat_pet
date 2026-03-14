@@ -1392,7 +1392,7 @@
         // ========== 猫咪状态更新函数 ==========
         function updateCatStatusBar(data) {
             if (!data.cat) return;
-            
+
             // 更新底部状态栏
             ['energy', 'mood', 'hunger', 'cleanliness'].forEach(stat => {
                 const el = document.getElementById('stat-' + stat);
@@ -1400,6 +1400,9 @@
                     el.textContent = data.cat[stat];
                 }
             });
+
+            // 暴露给猫咪动画系统
+            window.catStats = data.cat;
         }
 
         // ========== 加载聊天历史 ==========
@@ -4227,9 +4230,17 @@ function toggleBrokerPanel() {
             const cat = game.add.sprite(94, 557, 'cats', randomCatFrame).setOrigin(0.5);
             cat.setDepth(2000); // top layer
             cat.setInteractive({ useHandCursor: true });
-            // Expose to global for click handler
+            // Expose to global for click handler and animation system
             window.catSprite = cat;
             window.catsFrameCount = catsFrameCount;
+            window.catStats = null;
+            // 猫咪动画状态机
+            window.catAnim = {
+                baseX: 94, baseY: 557,   // home position
+                lastWalk: 0,             // last tween start timestamp
+                lastPose: 0,             // last frame switch timestamp
+                isTweening: false
+            };
             cat.on('pointerdown', () => {
                 const next = Math.floor(Math.random() * window.catsFrameCount);
                 window.catSprite.setFrame(next);
@@ -4550,6 +4561,7 @@ function toggleBrokerPanel() {
         function update(time) {
             if (time - lastFetch > FETCH_INTERVAL) { fetchStatus(); lastFetch = time; }
             if (time - lastGuestAgentsFetch > GUEST_AGENTS_FETCH_INTERVAL) { fetchGuestAgents(); lastGuestAgentsFetch = time; }
+            tickCatAnim(time);
 
             // 兜底：非 idle 时确保机房动画在播，idle 时静止
             const effectiveStateForServer = pendingDesiredState || currentState;
@@ -4951,6 +4963,78 @@ function toggleBrokerPanel() {
         }
 
         // 假 Agent 气泡逻辑已移除，统一以真实 /agents 数据为准
+
+        // ========== 猫咪动画驱动 ==========
+        // 由 Phaser update 每帧调用，根据 skill 状态数据决定行为频率
+        function tickCatAnim(time) {
+            const s = window.catSprite;
+            const a = window.catAnim;
+            if (!s || !a) return;
+
+            const stats = window.catStats || {};
+            const energy = stats.energy ?? 60;
+            const mood   = stats.mood   ?? 60;
+
+            // 活跃度 0~1：energy 和 mood 均值决定动作频率
+            const vitality = (energy + mood) / 200;
+
+            // 踱步间隔：活跃时 4s，慵懒时 20s（hunger/cleanliness 危急时几乎不动）
+            const hungry  = (stats.hunger    ?? 60) < 25;
+            const dirty   = (stats.cleanliness ?? 60) < 25;
+            const walkInterval = (hungry || dirty)
+                ? 25000
+                : Math.round(20000 - vitality * 16000); // 4000~20000 ms
+
+            // 换帧间隔：活跃时 6s，慵懒时 30s
+            const poseInterval = Math.round(30000 - vitality * 24000); // 6000~30000 ms
+
+            // ── 踱步 tween ──────────────────────────────────────────
+            if (!a.isTweening && time - a.lastWalk > walkInterval) {
+                a.lastWalk = time;
+                a.isTweening = true;
+
+                // 在 home 附近随机偏移（活跃时范围大）
+                const range = 20 + Math.round(vitality * 40); // 20~60 px
+                const dx = (Math.random() * 2 - 1) * range;
+                const dy = (Math.random() * 2 - 1) * (range * 0.4);
+                const tx = a.baseX + dx;
+                const ty = a.baseY + dy;
+
+                // 朝向
+                s.setFlipX(dx < 0);
+
+                const duration = 600 + Math.round((1 - vitality) * 800); // 600~1400 ms
+                game.tweens.add({
+                    targets: s,
+                    x: tx, y: ty,
+                    duration,
+                    ease: 'Sine.easeInOut',
+                    onComplete: () => {
+                        // 停顿后回到 home
+                        const pauseMs = 800 + Math.round((1 - vitality) * 2000);
+                        game.time.delayedCall(pauseMs, () => {
+                            s.setFlipX(dx >= 0); // 回头
+                            game.tweens.add({
+                                targets: s,
+                                x: a.baseX, y: a.baseY,
+                                duration,
+                                ease: 'Sine.easeInOut',
+                                onComplete: () => { a.isTweening = false; }
+                            });
+                        });
+                    }
+                });
+            }
+
+            // ── 换姿势（帧切换）────────────────────────────────────
+            if (time - a.lastPose > poseInterval) {
+                a.lastPose = time;
+                if (window.catsFrameCount > 1) {
+                    const next = Math.floor(Math.random() * window.catsFrameCount);
+                    s.setFrame(next);
+                }
+            }
+        }
 
         // 启动游戏
         initGame();

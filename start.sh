@@ -1,85 +1,78 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# 一键启动：Star-Office 后端 + 猫咪模拟器
+# 用法: bash start.sh [--llm openai|anthropic|ollama]
+set -euo pipefail
 
-echo ""
-echo "══════════════════════════════════════════════════"
-echo "  🐱 猫咪模拟器 - Cat Pet Simulator"
-echo "  连接 cat-pet 与 Star-Office 可视化"
-echo "══════════════════════════════════════════════════"
-echo ""
-echo "  功能:"
-echo "  - 状态可视化 (实时同步)"
-echo "  - 手动互动 (喂食/玩耍/洗澡/睡觉/摸摸)"
-echo "  - 状态衰减 (每小时自动下降)"
-echo "  - 自主行为 (智能决策)"
-echo ""
-echo "══════════════════════════════════════════════════"
-echo ""
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UI_DIR="$ROOT_DIR/Star-Office-UI-master"
+SIM_DIR="$ROOT_DIR/simulator"
 
-# 检查 Python
-if ! command -v python3 &> /dev/null; then
-    echo "❌ 未找到 Python，请先安装 Python 3.10+"
-    exit 1
+# 解析 --llm 参数
+LLM_ARG=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --llm) LLM_ARG="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+# 加载 .env（如果存在）
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a; source "$ROOT_DIR/.env"; set +a
 fi
 
-# 检查 Node.js
-if ! command -v node &> /dev/null; then
-    echo "❌ 未找到 Node.js，请先安装 Node.js"
-    exit 1
+# ── 启动 Flask 后端 ──────────────────────────────────────────────
+echo "🖥️  启动 Star-Office 后端 (port 19000)..."
+if [[ -f "$UI_DIR/.venv/bin/python" ]]; then
+  PYTHON="$UI_DIR/.venv/bin/python"
+elif command -v python3 &>/dev/null; then
+  PYTHON="python3"
+else
+  PYTHON="python"
 fi
 
-# 检查 Flask
-if ! python3 -c "import flask" &> /dev/null; then
-    echo "📦 安装 Python 依赖..."
-    pip3 install flask pillow -q
-fi
-
-# 准备状态文件
-if [ ! -f "Star-Office-UI-master/state.json" ]; then
-    cp "Star-Office-UI-master/state.sample.json" "Star-Office-UI-master/state.json"
-fi
-
-echo "🚀 启动 Star-Office 后端..."
-cd Star-Office-UI-master/backend
-python3 app.py &
+cd "$UI_DIR"
+"$PYTHON" backend/app.py &
 BACKEND_PID=$!
-cd ../..
+echo "   后端 PID: $BACKEND_PID"
 
-# 等待后端启动
-echo "⏳ 等待后端启动..."
-sleep 3
+# 等待后端就绪（最多 10 秒）
+echo "   等待后端就绪..."
+for i in $(seq 1 20); do
+  if curl -sf http://localhost:19000/status >/dev/null 2>&1; then
+    echo "   ✅ 后端已就绪"
+    break
+  fi
+  sleep 0.5
+done
 
-# 检查后端是否启动
-if ! curl -s http://127.0.0.1:19000/health > /dev/null; then
-    echo "❌ Star-Office 后端启动失败"
-    echo "   请检查端口 19000 是否被占用"
-    kill $BACKEND_PID 2>/dev/null
-    exit 1
+# ── 启动模拟器 ───────────────────────────────────────────────────
+echo "🐱 启动猫咪模拟器 (agent 模式)..."
+cd "$ROOT_DIR"
+if [[ -n "$LLM_ARG" ]]; then
+  node "$SIM_DIR/index.js" --agent --llm "$LLM_ARG" &
+else
+  node "$SIM_DIR/index.js" --agent &
 fi
-echo "✅ Star-Office 后端已启动"
+SIM_PID=$!
+echo "   模拟器 PID: $SIM_PID"
 
 echo ""
-echo "🚀 启动猫咪模拟器..."
+echo "✅ 全部启动完成"
+echo "   UI:         http://localhost:19000"
+echo "   后端 PID:   $BACKEND_PID"
+echo "   模拟器 PID: $SIM_PID"
 echo ""
-echo "══════════════════════════════════════════════════"
-echo "  🌐 打开浏览器访问: http://127.0.0.1:19000"
-echo "  按 Ctrl+C 停止模拟器"
-echo ""
-echo "  可用命令:"
-echo "  - node index.js status   查看状态"
-echo "  - node index.js feed     喂食"
-echo "  - node index.js play     玩耍"
-echo "══════════════════════════════════════════════════"
-echo ""
+echo "按 Ctrl+C 停止所有进程"
 
-# 信号处理
-trap "echo ''; echo '👋 正在停止...'; kill $BACKEND_PID 2>/dev/null; exit 0" SIGINT SIGTERM
+# 捕获退出信号，一并杀掉子进程
+cleanup() {
+  echo ""
+  echo "🛑 正在停止..."
+  kill "$BACKEND_PID" "$SIM_PID" 2>/dev/null || true
+  wait "$BACKEND_PID" "$SIM_PID" 2>/dev/null || true
+  echo "👋 已停止"
+}
+trap cleanup INT TERM
 
-# 启动模拟器 (Agent 模式：支持自然语言交互 + 后台状态同步)
-cd simulator
-node index.js --agent
-
-# 清理
-cd ..
-kill $BACKEND_PID 2>/dev/null
-echo ""
-echo "👋 模拟器已停止"
+wait
