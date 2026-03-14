@@ -65,7 +65,13 @@ class IntentRecognizer {
         patterns: ['健康', '体检', 'health', '健康检查']
       },
       
-      // 扩展功能
+      // 猫咪列表
+      {
+        intent: 'list_cats',
+        patterns: ['我的猫(咪)?列表', '列出猫咪', '所有猫', '有几只猫', '猫咪清单', 'list cats', 'my cats']
+      },
+
+      // 扩展功能（暂未实现，返回提示）
       {
         intent: 'shop',
         patterns: ['商店', '买玩具', 'shop', 'store']
@@ -74,7 +80,7 @@ class IntentRecognizer {
         intent: 'visit',
         patterns: ['拜访', '去别人家', 'visit']
       },
-      
+
       // 成就
       {
         intent: 'achievements',
@@ -216,7 +222,7 @@ class IntentRecognizer {
 
 用户输入：${input}
 
-可用意图：create_cat, feed, play, bathe, sleep, pet, drink, status, health, shop, visit, help, chat, unknown
+可用意图：create_cat, list_cats, delete_cat, feed, play, bathe, sleep, pet, drink, status, health, achievements, get_cooldowns, clear_cooldown, read_state, write_state, shop, visit, help, chat, unknown
 
 输出 JSON：
 {

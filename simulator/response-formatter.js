@@ -152,6 +152,22 @@ cooldowns: ${JSON.stringify(s.cooldowns || {})}`;
         return `✅ ${data.message}`;
       },
 
+      list_cats: (data) => {
+        if (data.error) return `❌ ${data.error}`;
+        const cats = data.cats || [];
+        if (cats.length === 0) return `🐱 你还没有猫咪，用"创建猫咪"开始吧~`;
+        const lines = cats.map(c => `• ${c.name}（${c.breed || '田园猫'}，${c.personality || '活泼'}）`);
+        return `🐱 你的猫咪列表（共 ${cats.length} 只）\n\n${lines.join('\n')}`;
+      },
+
+      shop: (data) => {
+        return `🛍️ ${data.message || '商店功能即将上线，敬请期待~'}`;
+      },
+
+      visit: (data) => {
+        return `🏘️ ${data.message || '拜访功能即将上线，敬请期待~'}`;
+      },
+
       error: (data) => {
         return `❌ ${data.message || '出错了喵...'}`;
       },
@@ -163,7 +179,7 @@ cooldowns: ${JSON.stringify(s.cooldowns || {})}`;
 喂食、玩耍、洗澡、睡觉、摸摸、喝水
 
 【创建/删除】
-创建猫、删除猫
+创建猫、删除猫、我的猫列表
 
 【查看信息】
 状态、健康检查、成就

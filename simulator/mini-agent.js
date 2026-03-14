@@ -184,6 +184,9 @@ class MiniAgent {
     switch (intent) {
       case 'create_cat':
         return this._createCat(params);
+
+      case 'list_cats':
+        return this._listCats();
       
       case 'feed':
         return this.bridge.interact('feed');
@@ -227,6 +230,12 @@ class MiniAgent {
       case 'write_state':
         return this._writeState(params);
 
+      case 'shop':
+        return { intent: 'shop', message: '商店功能即将上线，敬请期待~' };
+
+      case 'visit':
+        return { intent: 'visit', message: '拜访功能即将上线，敬请期待~' };
+
       case 'help':
         return { intent: 'help' };
 
@@ -236,6 +245,15 @@ class MiniAgent {
       default:
         return { intent: 'unknown', message: '未知命令' };
     }
+  }
+
+  /**
+   * 列出用户所有猫咪
+   */
+  _listCats() {
+    const catCore = require('../cat-core.js');
+    const result = catCore.getUserCats(this.userId);
+    return result;
   }
 
   /**
