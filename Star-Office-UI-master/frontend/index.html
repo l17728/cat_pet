@@ -1402,6 +1402,33 @@
             });
         }
 
+        // ========== 加载聊天历史 ==========
+        async function loadChatHistory() {
+          try {
+            const res = await fetch('/cat-chat/history');
+            const d = await res.json();
+            if (!d.ok || !d.messages) return;
+            const container = document.getElementById('cat-chat-messages');
+            // 只取真实 user/cat 消息，过滤系统消息
+            const real = d.messages.filter(m => m.type === 'user' || m.type === 'cat');
+            // 取最近 20 条
+            real.slice(-20).forEach(m => {
+              const time = m.time ? new Date(m.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+              const div = document.createElement('div');
+              div.className = 'chat-message ' + m.type;
+              if (m.type === 'cat') {
+                div.innerHTML = '<div class="cat-avatar">🐱</div><div>' + formatMarkdown(m.content) + '</div><div class="msg-time">' + time + '</div>';
+              } else {
+                div.innerHTML = '<div>' + escapeHtml(m.content) + '</div><div class="msg-time">' + time + '</div>';
+              }
+              container.appendChild(div);
+            });
+            if (real.length > 0) container.scrollTop = container.scrollHeight;
+          } catch (e) {
+            // 离线时静默忽略
+          }
+        }
+
         // ========== 状态映射（猫咪状态 → 游戏行为）==========
         const CAT_STATE_MAP = {
             // 低状态映射
@@ -4513,6 +4540,9 @@ function toggleBrokerPanel() {
             // 加载昨日 memo
             loadMemo();
 
+            // 加载聊天历史（最近 20 条真实对话）
+            loadChatHistory();
+
             fetchStatus();
             fetchGuestAgents();
         }
@@ -4721,6 +4751,9 @@ function toggleBrokerPanel() {
                             currentState = nextState;
                         }
                         applyVisualState(nextState);
+
+                        // 更新猫咪状态面板
+                        updateCatStatusBar(data);
 
                         if (changed) {
                             typewriterTarget = nextLine;

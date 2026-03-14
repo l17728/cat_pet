@@ -149,12 +149,22 @@ function markTodoDone(taskStr) {
 }
 
 /**
- * 获取当前到期的任务（时间 <= 当前时间）
+ * 获取当前到期的任务（时间 <= 当前时间，且是今天写入的）
  */
 function getDueTasks() {
   const { pending } = readTodo();
   const now = new Date();
   const cur = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const today = now.toLocaleDateString('zh-CN');
+
+  // 检查 todo.md 文件的修改日期，过期文件（非今天）不触发任务
+  const p = todoPath();
+  if (fs.existsSync(p)) {
+    const stat = fs.statSync(p);
+    const fileDate = new Date(stat.mtime).toLocaleDateString('zh-CN');
+    if (fileDate !== today) return [];
+  }
+
   return pending.filter(t => t.time <= cur);
 }
 
