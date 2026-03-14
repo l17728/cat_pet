@@ -103,6 +103,11 @@ class LLMAdapter {
         this.logger.log(options.context || 'LLM调用', prompt, result);
       }
 
+      // 剥掉 LLM 偶尔在对话回复外面加的首尾引号（如 "喵呜~..." → 喵呜~...）
+      if (typeof result === 'string') {
+        result = result.replace(/^[""\s]+|[""\s]+$/g, '').trim();
+      }
+
       return result;
     } catch (error) {
       console.error('[LLM] 调用失败:', error.message);
