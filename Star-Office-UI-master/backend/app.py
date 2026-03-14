@@ -1377,24 +1377,9 @@ def cat_chat_endpoint():
             chat_data["pending_input"] = []
         chat_data["pending_input"].append(user_message)
 
-        # 检查是否有待返回的猫咪响应（由模拟器预先推送）
-        response = None
-        if chat_data.get("pending_responses"):
-            response = chat_data["pending_responses"].pop(0)
-            chat_data["messages"].append({
-                "type": "cat",
-                "content": response,
-                "time": datetime.now().isoformat()
-            })
-
-        # 保存
+        # 保存（不再从 pending_responses 弹出——前端通过 /cat-chat/poll 轮询真实回复）
         save_cat_chat(chat_data)
-
-        if response:
-            return jsonify({"ok": True, "response": response})
-        else:
-            # 没有预设响应，返回 null，前端将轮询历史等待模拟器回复
-            return jsonify({"ok": True, "response": None})
+        return jsonify({"ok": True, "response": None})
             
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)}), 500
@@ -1446,6 +1431,25 @@ def cat_chat_pop_input_endpoint():
         inputs = chat_data.pop("pending_input", [])
         save_cat_chat(chat_data)
         return jsonify({"ok": True, "inputs": inputs})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
+
+@app.route("/cat-chat/poll", methods=["GET"])
+def cat_chat_poll_endpoint():
+    """轮询：取出一条待返回的猫咪回复（供前端等待模拟器真实响应）"""
+    try:
+        chat_data = load_cat_chat()
+        if chat_data.get("pending_responses"):
+            response = chat_data["pending_responses"].pop(0)
+            chat_data["messages"].append({
+                "type": "cat",
+                "content": response,
+                "time": datetime.now().isoformat()
+            })
+            save_cat_chat(chat_data)
+            return jsonify({"ok": True, "response": response})
+        return jsonify({"ok": True, "response": None})
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)}), 500
 

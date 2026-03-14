@@ -1586,11 +1586,12 @@
         async function loadMemo() {
             const memoDate = document.getElementById('memo-date');
             const memoContent = document.getElementById('memo-content');
-            
+            if (!memoDate || !memoContent) return;
+
             try {
                 const response = await fetch('/yesterday-memo?t=' + Date.now(), { cache: 'no-store' });
                 const data = await response.json();
-                
+
                 if (data.success && data.memo) {
                     memoDate.textContent = data.date || '';
                     memoContent.innerHTML = data.memo.replace(/\n/g, '<br>');
@@ -4954,29 +4955,41 @@ function toggleBrokerPanel() {
         async function sendCatChat() {
           const input = document.getElementById('cat-chat-input');
           const message = input.value.trim();
-          
+
           if (!message) return;
-          
+
           // 添加用户消息
           addChatMessage('user', message);
           input.value = '';
-          
+
           try {
-            // 发送到后端处理
-            const response = await fetch('/cat-chat', {
+            // 发送到后端，放入 pending_input 供模拟器处理
+            await fetch('/cat-chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ message })
             });
-            
-            const data = await response.json();
-            
-            if (data.response) {
-              // 延迟一点显示猫咪回复，更自然
-              setTimeout(() => {
-                addChatMessage('cat', data.response);
-              }, 500);
-            }
+
+            // 轮询等待模拟器的真实回复（最多 15 秒，每 500ms 一次）
+            let waited = 0;
+            const pollInterval = 500;
+            const maxWait = 15000;
+            const poll = setInterval(async () => {
+              waited += pollInterval;
+              try {
+                const res = await fetch('/cat-chat/poll');
+                const d = await res.json();
+                if (d.response) {
+                  clearInterval(poll);
+                  addChatMessage('cat', d.response);
+                } else if (waited >= maxWait) {
+                  clearInterval(poll);
+                  addChatMessage('cat', '喵呜~ (猫咪在思考中，请稍后再问)');
+                }
+              } catch (e) {
+                clearInterval(poll);
+              }
+            }, pollInterval);
           } catch (e) {
             // 离线模式：显示默认回复
             setTimeout(() => {
