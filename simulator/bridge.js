@@ -15,6 +15,7 @@ const config = require('./config');
 const OfficeClient = require('./office-client');
 const BackgroundScheduler = require('./background-scheduler');
 const LLMAdapter = require('./llm-adapter');
+const interactionLogger = require('./interaction-logger');
 const { mapCatToOffice, getCatStatusSummary, adjustDetailByPersonality } = require('./state-mapper');
 const memory = require('./memory-manager');
 
@@ -47,7 +48,8 @@ class CatPetBridge {
       provider: options.llmProvider || process.env.LLM_PROVIDER,
       apiKey: options.llmApiKey || process.env.LLM_API_KEY,
       apiBaseUrl: options.llmApiUrl || process.env.LLM_API_URL,
-      model: options.llmModel || process.env.LLM_MODEL
+      model: options.llmModel || process.env.LLM_MODEL,
+      logger: interactionLogger
     });
     
     // ========== 对话记录和上下文管理 ==========
@@ -175,7 +177,7 @@ class CatPetBridge {
       }
 
       // 调用 LLM
-      const response = await this.llm.chat(messages);
+      const response = await this.llm.chat(messages, { context: '对话交互' });
 
       // 将助手回复追加到历史
       this.addToHistory('assistant', response);
@@ -217,7 +219,7 @@ class CatPetBridge {
       // 将临时触发 prompt 追加到历史，确保 user/assistant 交替不断链
       this.addToHistory('user', prompt, { ephemeral: true, reason });
 
-      const response = await this.llm.chat(messages);
+      const response = await this.llm.chat(messages, { context: '主动发起对话' });
 
       if (response) {
         this.addToHistory('assistant', response, { proactive: true, reason });

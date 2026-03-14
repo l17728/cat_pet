@@ -17,21 +17,24 @@ class LLMAdapter {
   constructor(options = {}) {
     // 加载配置文件
     this.config = this.loadConfig();
-    
+
     // 优先级: 选项参数 > 配置文件 > 环境变量
     this.provider = options.provider || this.config.provider || process.env.LLM_PROVIDER || 'none';
     this.apiKey = options.apiKey || this.config.apiKey || process.env.LLM_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN;
     this.baseUrl = options.apiBaseUrl || this.config.baseUrl || process.env.LLM_API_URL || process.env.ANTHROPIC_BASE_URL;
     this.model = options.model || this.config.model || process.env.LLM_MODEL || process.env.ANTHROPIC_MODEL || 'glm-5';
-    
+
     // 生成参数
     this.temperature = this.config.generation?.temperature || 0.8;
     this.maxTokens = this.config.generation?.maxTokens || 500;
     this.systemPrompt = this.config.systemPrompt || '你是一只可爱的虚拟猫咪。';
-    
+
     // Ollama 配置
     this.ollamaUrl = options.ollamaUrl || process.env.OLLAMA_URL || 'http://localhost:11434';
     this.ollamaModel = options.ollamaModel || process.env.OLLAMA_MODEL || 'llama2';
+
+    // 交互日志记录器
+    this.logger = options.logger || null;
   }
 
   /**
@@ -72,23 +75,35 @@ class LLMAdapter {
     try {
       // 判断输入类型：字符串或消息数组
       const isMessagesFormat = Array.isArray(prompt);
-      
+
+      let result;
       switch (this.provider) {
         case 'anthropic':
-          return await this.callAnthropicWithMessages(prompt, options, isMessagesFormat);
+          result = await this.callAnthropicWithMessages(prompt, options, isMessagesFormat);
+          break;
         case 'openai':
-          return await this.callOpenAIWithMessages(prompt, options, isMessagesFormat);
+          result = await this.callOpenAIWithMessages(prompt, options, isMessagesFormat);
+          break;
         case 'ollama':
-          return isMessagesFormat 
+          result = isMessagesFormat
             ? await this.callOllamaChat(prompt, options)
             : await this.callOllama(prompt, options);
+          break;
         case 'custom':
-          return await this.callCustom(prompt, options);
+          result = await this.callCustom(prompt, options);
+          break;
         case 'openclaw':
-          return await this.callOpenClaw(prompt, options);
+          result = await this.callOpenClaw(prompt, options);
+          break;
         default:
-          return null;
+          result = null;
       }
+
+      if (this.logger) {
+        this.logger.log(options.context || 'LLM调用', prompt, result);
+      }
+
+      return result;
     } catch (error) {
       console.error('[LLM] 调用失败:', error.message);
       return null;

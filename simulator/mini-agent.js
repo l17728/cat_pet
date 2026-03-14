@@ -16,6 +16,7 @@ const ResponseFormatter = require('./response-formatter');
 const LLMAdapter = require('./llm-adapter');
 const { loadCatData, saveCatData } = require('../core/evolvable');
 const memory = require('./memory-manager');
+const interactionLogger = require('./interaction-logger');
 
 // 注入 LLM 适配器到全局
 let globalLLMAdapter = null;
@@ -27,7 +28,8 @@ class MiniAgent {
       provider: options.llmProvider,
       apiKey: options.llmApiKey,
       apiBaseUrl: options.llmApiUrl,
-      model: options.llmModel
+      model: options.llmModel,
+      logger: interactionLogger
     });
     
     // 设置全局 LLM 适配器（供 evolution 系统使用）
@@ -156,7 +158,7 @@ class MiniAgent {
         messages[messages.length - 1] = { ...last, content: last.content + actionContext };
       }
 
-      const response = await this.bridge.llm.chat(messages);
+      const response = await this.bridge.llm.chat(messages, { context: '上下文响应生成' });
       return response || await this.formatter.format(intentResult.intent, actionResult, cat);
     } catch (error) {
       console.error('生成响应失败:', error);

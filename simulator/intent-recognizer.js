@@ -232,7 +232,7 @@ class IntentRecognizer {
 }`;
 
     try {
-      const response = await this.llm.call(prompt, { maxTokens: 100 });
+      const response = await this.llm.call(prompt, { maxTokens: 100, context: '意图识别' });
       const result = this.llm.parseJson(response);
       
       if (result && result.intent) {

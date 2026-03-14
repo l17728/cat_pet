@@ -239,7 +239,7 @@ cooldowns: ${JSON.stringify(s.cooldowns || {})}`;
 用可爱的猫咪语气回复主人（50字以内），加入拟声词如"喵呜~"。`;
 
     try {
-      const response = await this.llm.call(prompt, { maxTokens: 100 });
+      const response = await this.llm.call(prompt, { maxTokens: 100, context: '响应格式化' });
       if (response) {
         return response;
       }

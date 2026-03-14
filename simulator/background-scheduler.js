@@ -366,7 +366,7 @@ class BackgroundScheduler {
 - next_check_minutes: 建议下次检查间隔（分钟）。状态差时 5-10，正常时 20-30，状态优秀时 45-60
 - todo_task: 如果需要在未来某时间执行任务，填 "HH:MM 任务描述"，否则为 null`;
 
-      const response = await this.llmClient.call(prompt, { maxTokens: 200 });
+      const response = await this.llmClient.call(prompt, { maxTokens: 200, context: '自主行为决策' });
       return this.llmClient.parseJson(response);
     } catch (e) {
       console.error('[LLM 决策失败]', e.message);
