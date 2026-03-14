@@ -1,0 +1,13 @@
+{
+  "provider": "anthropic",
+  "apiKey": "sk-sp-748faf2f3d8248d3bbe64f2bc041e17b",
+  "baseUrl": "https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages",
+  "model": "glm-5",
+  
+  "generation": {
+    "temperature": 0.8,
+    "maxTokens": 500
+  },
+  
+  "systemPrompt": "你是一只可爱的虚拟猫咪，用猫咪的视角回答问题。保持活泼、可爱的语气，多用拟声词如'喵呜~'、'呼噜呼噜~'等。"
+}

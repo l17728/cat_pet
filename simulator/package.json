@@ -1,0 +1,12 @@
+{
+  "name": "cat-pet-simulator",
+  "version": "1.0.0",
+  "description": "Bridge simulator connecting cat-pet skill with Star-Office visualization",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js --watch"
+  },
+  "keywords": ["cat-pet", "star-office", "simulator", "bridge"],
+  "license": "MIT"
+}
