@@ -1364,15 +1364,20 @@ def cat_chat_endpoint():
         
         # 加载聊天历史
         chat_data = load_cat_chat()
-        
+
         # 添加用户消息
         chat_data["messages"].append({
             "type": "user",
             "content": user_message,
             "time": datetime.now().isoformat()
         })
-        
-        # 检查是否有待返回的猫咪响应（由模拟器推送）
+
+        # 将消息放入待处理队列，供模拟器 Agent 处理
+        if "pending_input" not in chat_data:
+            chat_data["pending_input"] = []
+        chat_data["pending_input"].append(user_message)
+
+        # 检查是否有待返回的猫咪响应（由模拟器预先推送）
         response = None
         if chat_data.get("pending_responses"):
             response = chat_data["pending_responses"].pop(0)
@@ -1381,15 +1386,15 @@ def cat_chat_endpoint():
                 "content": response,
                 "time": datetime.now().isoformat()
             })
-        
+
         # 保存
         save_cat_chat(chat_data)
-        
+
         if response:
             return jsonify({"ok": True, "response": response})
         else:
-            # 没有预设响应，返回默认
-            return jsonify({"ok": True, "response": "喵呜~ (等待主人来陪我玩...)"})
+            # 没有预设响应，返回 null，前端将轮询历史等待模拟器回复
+            return jsonify({"ok": True, "response": None})
             
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)}), 500
@@ -1429,6 +1434,18 @@ def cat_chat_push_endpoint():
         save_cat_chat(chat_data)
         
         return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
+
+@app.route("/cat-chat/pop-input", methods=["POST"])
+def cat_chat_pop_input_endpoint():
+    """取出并清空待处理的用户输入（供模拟器 Agent 轮询）"""
+    try:
+        chat_data = load_cat_chat()
+        inputs = chat_data.pop("pending_input", [])
+        save_cat_chat(chat_data)
+        return jsonify({"ok": True, "inputs": inputs})
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)}), 500
 

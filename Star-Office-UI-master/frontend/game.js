@@ -728,8 +728,11 @@ function updateCatStatusPanel(data) {
     }
   });
 
-  // 保存最新猫咪状态数据
-  if (data.cat && data.cat.name) currentCatData = data.cat;
+  // 保存最新猫咪状态数据，同步更新聊天窗口标题
+  if (data.cat && data.cat.name) {
+    currentCatData = data.cat;
+    updateChatCatName(data.cat.name);
+  }
 
   // 根据心情更新装饰猫咪的帧（0-3开心 4-7普通 8-11难过）
   if (data.cat && data.cat.mood !== undefined && window.catSprite) {
@@ -1160,13 +1163,16 @@ function handleChatKeypress(event) {
 async function sendCatChat() {
   const input = document.getElementById('cat-chat-input');
   const message = input.value.trim();
-  
+
   if (!message) return;
-  
+
   // 添加用户消息
   addChatMessage('user', message);
   input.value = '';
-  
+
+  // 记录发送时的猫咪消息数量，用于检测模拟器新回复
+  const catMsgCountBefore = catChatMessages.filter(m => m.type === 'cat').length;
+
   try {
     // 发送到后端处理
     const response = await fetch('/cat-chat', {
@@ -1174,20 +1180,35 @@ async function sendCatChat() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message })
     });
-    
+
     const data = await response.json();
-    
+
     if (data.response) {
-      // 延迟一点显示猫咪回复，更自然
-      setTimeout(() => {
-        addChatMessage('cat', data.response);
-      }, 500);
+      // 有预置响应，直接显示
+      setTimeout(() => addChatMessage('cat', data.response), 500);
+    } else {
+      // 无预置响应：模拟器正在处理，轮询历史等待回复（最多10秒）
+      let attempts = 0;
+      const poller = setInterval(async () => {
+        attempts++;
+        if (attempts > 10) { clearInterval(poller); return; }
+        try {
+          const hr = await fetch('/cat-chat/history');
+          const hd = await hr.json();
+          const catMsgs = (hd.messages || []).filter(m => m.type === 'cat');
+          if (catMsgs.length > catMsgCountBefore) {
+            const latest = catMsgs[catMsgs.length - 1];
+            // 避免重复显示
+            const isDup = catChatMessages.some(m => m.type === 'cat' && m.content === latest.content);
+            if (!isDup) addChatMessage('cat', latest.content);
+            clearInterval(poller);
+          }
+        } catch (e) {}
+      }, 1000);
     }
   } catch (e) {
     // 离线模式：显示默认回复
-    setTimeout(() => {
-      addChatMessage('cat', '喵呜~ (猫咪没听懂，再试试？)');
-    }, 500);
+    setTimeout(() => addChatMessage('cat', '喵呜~ (猫咪没听懂，再试试？)'), 500);
   }
 }
 

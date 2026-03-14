@@ -431,6 +431,8 @@ class MiniAgent {
     if (this.running) return;
     this.running = true;
     this.bridge.start();
+    // 轮询浏览器聊天窗口发来的用户输入（每2秒）
+    this._chatPollTimer = setInterval(() => this._pollChatInput(), 2000);
   }
 
   /**
@@ -439,6 +441,24 @@ class MiniAgent {
   stopBackground() {
     this.running = false;
     this.bridge.stop();
+    if (this._chatPollTimer) { clearInterval(this._chatPollTimer); this._chatPollTimer = null; }
+  }
+
+  /**
+   * 轮询浏览器聊天窗口中的用户输入并通过 MiniAgent 处理
+   */
+  async _pollChatInput() {
+    try {
+      const res = await this.bridge.officeClient._request('POST', '/cat-chat/pop-input', {});
+      if (res && res.inputs && res.inputs.length > 0) {
+        for (const input of res.inputs) {
+          console.log(`[聊天窗口 →] ${input}`);
+          await this.process(input);
+        }
+      }
+    } catch (e) {
+      // 后端未启动时忽略
+    }
   }
 
   /**
