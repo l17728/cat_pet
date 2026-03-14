@@ -16,6 +16,7 @@ node test-game.js      # game flow tests
 node test-enhanced.js  # enhanced features tests
 node test-evolution.js # evolution system tests
 node test-verify.js    # verification tests
+node simulator/test.js # simulator unit tests (no Star-Office backend required)
 ```
 
 There is no lint or build step — this is plain Node.js with no transpilation.
@@ -25,10 +26,10 @@ There is no lint or build step — this is plain Node.js with no transpilation.
 There are **two parallel implementations** in this repo:
 
 ### 1. `cat-core.js` + `core/` — Evolution System (v3.0)
-The primary entry point. `cat-core.js` (main module per `package.json`) imports the evolution subsystem from `core/evolution-index.js`, which re-exports all evolution components:
+The primary entry point (`main` in `package.json`). `cat-core.js` imports the evolution subsystem from `core/evolution-index.js`, which re-exports all evolution components:
 
 - `core/evolvable.js` — base interface and shared utilities (`loadCatData`, `saveCatData`, `callLLM`, rarity helpers)
-- `core/evolution-manager.js` — orchestrates all evolution checks after interactions
+- `core/evolution-manager.js` — orchestrates all evolution checks after interactions; composes ActionSystem, ReactionSystem, ToySystem, FacilitySystem, AutoActionSystem
 - `core/action-system.js` — cats learn/invent new actions
 - `core/reaction-system.js` — personality-based unique reactions
 - `core/toy-system.js` — toys develop new play styles after 30 uses
@@ -51,6 +52,33 @@ Data is persisted as JSON files at `$OPENCLAW_WORKSPACE/cat-pet/data/{userId}.js
 - `src/core/exploration-system.js`, `social-system.js`, `multi-cat-system.js`, `biography-system.js`
 - `src/core/logging-system.js` — structured interaction logs
 
+### 3. `simulator/` — Standalone Visualization Bridge
+The simulator runs cat-pet independently (without OpenClaw) and syncs state to the **Star-Office** visual dashboard. It has its own MiniAgent that handles natural language via pluggable LLM adapters.
+
+```bash
+# Start Star-Office backend first (Python/Flask):
+cd Star-Office-UI-master && pip install flask pillow && cp state.sample.json state.json
+cd backend && python app.py
+
+# Then run the simulator:
+cd simulator && node index.js
+
+# One-shot command (e.g. feed):
+node simulator/index.js feed
+
+# Natural language via LLM:
+LLM_PROVIDER=openai LLM_API_KEY=sk-xxx node simulator/index.js "给猫喂食"
+```
+
+Key simulator files:
+- `simulator/bridge.js` — core bridge between cat-pet and Star-Office HTTP API
+- `simulator/mini-agent.js` — standalone agent with intent recognition and response formatting
+- `simulator/llm-adapter.js` — pluggable LLM backend (OpenAI / Ollama / Anthropic-compatible)
+- `simulator/background-scheduler.js` — decay (hourly), auto-action (30 min), state sync (3 sec)
+- `simulator/state-mapper.js` — maps cat stats to Star-Office office areas
+
+LLM config for simulator: edit `simulator/llm-config.json` or set env vars `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL`.
+
 ### Integration Pattern
 
 ```
@@ -61,7 +89,7 @@ The `AGENT_INSTRUCTIONS.md` file documents all available tool functions and thei
 
 ## Key Design Constraints
 
-- **No direct LLM calls in skill code.** The `callLLM` utility in `core/evolvable.js` exists as a stub/interface — actual LLM invocation is the Agent's responsibility. Any code that calls `sessions_spawn` directly is considered a design anti-pattern (documented in `ARCHITECTURE_REDESIGN.md`).
+- **No direct LLM calls in skill code.** The `callLLM` utility in `core/evolvable.js` exists as a stub/interface with a three-tier fallback: (1) globally injected `LLMAdapter` (simulator mode), (2) OpenClaw `sessions_spawn` (platform mode), (3) returns `null` (offline mode). Any code that calls `sessions_spawn` directly is considered a design anti-pattern (documented in `ARCHITECTURE_REDESIGN.md`).
 - **Pure functions preferred.** Tool functions should take input, mutate persisted JSON, and return structured objects — not formatted text.
 - **Data directory is runtime-determined** via `OPENCLAW_WORKSPACE` env var, defaulting to `/root/.openclaw/workspace`.
 

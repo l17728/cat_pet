@@ -92,13 +92,18 @@ class MiniAgent {
     const intentResult = await this.recognizer.recognize(input);
     console.log(`[意图] ${intentResult.intent} (置信度: ${intentResult.confidence})`);
 
-    // 2. 执行动作（调用 cat skill 业务逻辑）
+    // 2. 将用户输入写入日记（先于执行，保证顺序：用户→行动→回复）
+    if (this.catId) {
+      memory.appendDiary(this.catId, `用户: ${input}`);
+    }
+
+    // 3. 执行动作（调用 cat skill 业务逻辑）
     const actionResult = await this.execute(intentResult);
 
-    // 3. 获取猫咪最新状态
+    // 4. 获取猫咪最新状态
     const cat = this._getCat();
 
-    // 4. 将用户输入追加到对话历史
+    // 5. 将用户输入追加到对话历史
     this.bridge.addToHistory('user', input);
 
     // 5. 生成回复（LLM 模式使用完整对话历史；否则降级模板）
@@ -112,9 +117,8 @@ class MiniAgent {
     // 6. 将 LLM 回复追加到对话历史（同时自动持久化到磁盘）
     this.bridge.addToHistory('assistant', response);
 
-    // 7. 写入游戏日记（对应 OpenClaw memory/YYYY-MM-DD.md）
+    // 7. 写入猫咪回复到日记（用户消息已在步骤 2 写入）
     if (this.catId) {
-      memory.appendDiary(this.catId, `用户: ${input}`);
       memory.appendDiary(this.catId, `猫咪[${intentResult.intent}]: ${response.slice(0, 80)}${response.length > 80 ? '…' : ''}`);
     }
 

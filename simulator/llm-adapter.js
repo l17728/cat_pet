@@ -390,38 +390,6 @@ class LLMAdapter {
     }
   }
 
-/**
-   * 决定猫咪自主行为，并给出下次检查时间建议
-   * 对应 OpenClaw cron 触发后 LLM 决策下一步
-   */
-  async decideAutoAction(cat) {
-    if (!this.isAvailable()) return null;
-
-    const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-    const prompt = `你是${cat.name}，一只${cat.personality}的猫咪。现在时间 ${timeStr}。
-当前状态：精力${cat.stats.energy} 心情${cat.stats.mood} 饱食${cat.stats.hunger} 清洁${cat.stats.cleanliness}
-
-你现在想做什么？状态好时多少分钟后需要再次检查，状态差时应更快检查。
-
-输出 JSON（只输出 JSON，不要其他文字）:
-{
-  "action": "sleep|play|explore|request|groom|drink",
-  "description": "一句话描述正在做什么",
-  "notifyOwner": false,
-  "next_check_minutes": 30,
-  "todo_task": null
-}
-
-说明：
-- next_check_minutes: 建议下次检查间隔（分钟）。状态差时 5-10，正常时 20-30，状态优秀时 45-60
-- todo_task: 如果需要在未来某时间执行任务，填 "HH:MM 任务描述"，否则为 null`;
-
-    const response = await this.call(prompt, { maxTokens: 200 });
-    return this.parseJson(response);
-  }
-
   /**
    * 打印配置状态
    */

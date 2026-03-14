@@ -79,10 +79,11 @@ class BackgroundScheduler {
     if (this.autoActionTimer) clearTimeout(this.autoActionTimer);
     if (this.syncTimer) clearInterval(this.syncTimer);
     if (this.todoCheckTimer) clearInterval(this.todoCheckTimer);
-    
+
     this.decayTimer = null;
     this.autoActionTimer = null;
     this.syncTimer = null;
+    this.todoCheckTimer = null;
     
     console.log('⏹️ 后台调度器已停止');
   }
@@ -158,8 +159,13 @@ class BackgroundScheduler {
   _scheduleNextAutoAction(delayMs) {
     this.autoActionTimer = setTimeout(async () => {
       if (!this.isRunning) return;
-      const nextDelayMs = await this.runAutoAction();
-      // LLM 返回了建议间隔则用它，否则退回默认
+      let nextDelayMs = null;
+      try {
+        nextDelayMs = await this.runAutoAction();
+      } catch (e) {
+        // 任何异常都不能让循环静默死亡（对应 OpenClaw cron 的故障重试）
+        console.error('[调度] runAutoAction 出错，使用默认间隔继续:', e.message);
+      }
       this._scheduleNextAutoAction(nextDelayMs || this.autoActionInterval);
     }, delayMs);
   }
@@ -333,18 +339,39 @@ class BackgroundScheduler {
 
   /**
    * LLM 决策（需要 LLM）
+   * 提示词在此构建，保持 LLMAdapter 为纯传输层
    */
   async decideWithLLM(cat) {
-    // 如果有 LLM 客户端，调用它
-    if (this.llmClient) {
-      try {
-        return await this.llmClient.decideAutoAction(cat);
-      } catch (e) {
-        console.error('[LLM 决策失败]', e.message);
-        return null;
-      }
+    if (!this.llmClient || !this.llmClient.isAvailable()) return null;
+
+    try {
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+      const prompt = `你是${cat.name}，一只${cat.personality}的猫咪。现在时间 ${timeStr}。
+当前状态：精力${cat.stats.energy} 心情${cat.stats.mood} 饱食${cat.stats.hunger} 清洁${cat.stats.cleanliness}
+
+你现在想做什么？状态好时多少分钟后需要再次检查，状态差时应更快检查。
+
+输出 JSON（只输出 JSON，不要其他文字）:
+{
+  "action": "sleep|play|explore|request|groom|drink",
+  "description": "一句话描述正在做什么",
+  "notifyOwner": false,
+  "next_check_minutes": 30,
+  "todo_task": null
+}
+
+说明：
+- next_check_minutes: 建议下次检查间隔（分钟）。状态差时 5-10，正常时 20-30，状态优秀时 45-60
+- todo_task: 如果需要在未来某时间执行任务，填 "HH:MM 任务描述"，否则为 null`;
+
+      const response = await this.llmClient.call(prompt, { maxTokens: 200 });
+      return this.llmClient.parseJson(response);
+    } catch (e) {
+      console.error('[LLM 决策失败]', e.message);
+      return null;
     }
-    return null;
   }
 
   /**
